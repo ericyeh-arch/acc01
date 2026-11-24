@@ -169,6 +169,7 @@
   }).join('');
 
   let me = null, profile = null, data = [], editingId = null;
+  const isViewer = () => profile?.role === 'viewer';
 
   // ---------- 登入 ----------
   $('authForm').onsubmit = async e => {
@@ -186,7 +187,8 @@
     me = user;
     const { data: p } = await db.from('profiles').select('name, role').eq('id', user.id).single();
     profile = p || { name: user.email, role: 'user' };
-    $('who').textContent = `${profile.name}${profile.role === 'admin' ? '(管理員)' : ''}`;
+    $('who').textContent = `${profile.name}${profile.role === 'admin' ? '(管理員)' : profile.role === 'viewer' ? '(唯讀)' : ''}`;
+    $('addBtn').classList.toggle('hidden', isViewer()); $('importBtn').classList.toggle('hidden', isViewer());
     $('authView').classList.add('hidden'); $('appView').classList.remove('hidden');
     await load();
   }
@@ -228,9 +230,9 @@
       <td class="num">${fmt(r.amount)}</td><td class="item">${esc(r.reason)}</td>
       <td><span class="badge ${r.progress === '已審' ? 'ok' : 'wait'}">${esc(r.progress)}</span></td>
       <td>${esc(r.voucher_no)}</td>
-      <td><div class="actions">
+      <td><div class="actions">${isViewer() ? '' : `
         <button class="sm" data-a="edit" data-id="${r.id}">編輯</button>
-        <button class="sm danger" data-a="del" data-id="${r.id}">刪除</button></div></td></tr>`).join('');
+        <button class="sm danger" data-a="del" data-id="${r.id}">刪除</button>`}</div></td></tr>`).join('');
   }
   ['q', 'fProg', 'fYear'].forEach(id => $(id).addEventListener('input', render));
 

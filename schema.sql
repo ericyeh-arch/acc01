@@ -127,3 +127,35 @@ create policy acc_delete on public.acc_ledger for delete
   using (created_by = auth.uid() or public.is_admin());
 
 grant select, insert, update, delete on public.acc_ledger to authenticated;
+
+-- ============================================================
+-- 唯讀角色 viewer:可查看全部帳務資料,不可新增/修改/刪除
+-- 設定方式(先在 Authentication 建立使用者):
+--   update public.profiles set role = 'viewer'
+--     where id = (select id from auth.users where email = 'guest@example.com');
+-- ============================================================
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check
+  check (role in ('user','admin','viewer'));
+
+create or replace function public.is_viewer()
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'viewer');
+$$;
+
+drop policy if exists acc_select on public.acc_ledger;
+create policy acc_select on public.acc_ledger for select
+  using (created_by = auth.uid() or public.is_admin() or public.is_viewer());
+
+drop policy if exists acc_insert on public.acc_ledger;
+create policy acc_insert on public.acc_ledger for insert
+  with check (created_by = auth.uid() and not public.is_viewer());
+
+drop policy if exists acc_update on public.acc_ledger;
+create policy acc_update on public.acc_ledger for update
+  using ((created_by = auth.uid() or public.is_admin()) and not public.is_viewer())
+  with check ((created_by = auth.uid() or public.is_admin()) and not public.is_viewer());
+
+drop policy if exists acc_delete on public.acc_ledger;
+create policy acc_delete on public.acc_ledger for delete
+  using ((created_by = auth.uid() or public.is_admin()) and not public.is_viewer());
